@@ -50,3 +50,47 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
+
+  deploy:
+    name: Desplegar en EC2
+    needs: publish
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: eventos-ec2-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Configurar clave SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_HOST_FINGERPRINT: ${{ secrets.EC2_HOST_FINGERPRINT }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          ssh-keyscan -T 10 -t ed25519 "$EC2_HOST" > ~/.ssh/known_hosts
+
+          ACTUAL_FINGERPRINT=$(ssh-keygen -lf ~/.ssh/known_hosts -E sha256 | awk '{print $2}')
+
+          if [[ "$ACTUAL_FINGERPRINT" != "$EC2_HOST_FINGERPRINT" ]]; then
+            echo "ERROR: la huella SSH del servidor no coincide."
+            exit 1
+          fi
+
+          chmod 600 ~/.ssh/known_hosts
+          echo "OK: identidad SSH del servidor verificada."
+
+      - name: Desplegar version publicada
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "/opt/eventos-deploy/deploy.sh $IMAGE_TAG"
