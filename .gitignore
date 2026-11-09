@@ -1,0 +1,38 @@
+# Credenciales y configuraciones privadas
+.env
+.env.*
+!.env.example
+.aws/
+**/.aws/
+*.pem
+*.key
+*.p12
+*.pfx
+credentials
+
+# Archivos de compilación
+**/target/
+**/build/
+*.class
+*.jar
+
+# Entornos de desarrollo
+.idea/
+.vscode/
+*.iml
+
+# Archivos temporales y respaldos
+*.bak
+*.pre-*
+*.log
+*.tmp
+*~
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Datos locales
+*.db
+*.sqlite
+*.sqlite3

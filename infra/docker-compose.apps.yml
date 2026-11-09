@@ -1,0 +1,66 @@
+services:
+  ms-eventos:
+    build: ../ms-eventos
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/eventos_db
+      DB_USER: eventos
+      DB_PASSWORD: ${DB_PASSWORD}
+    networks:
+      - backend
+
+  ms-reservas:
+    build: ../ms-reservas
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/reservas_db
+      DB_USER: eventos
+      DB_PASSWORD: ${DB_PASSWORD}
+      EVENTOS_URL: http://ms-eventos:8081
+    depends_on:
+      - ms-eventos
+    networks:
+      - backend
+
+  ms-tickets:
+    build: ../ms-tickets
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/tickets_db
+      DB_USER: eventos
+      DB_PASSWORD: ${DB_PASSWORD}
+      EVENTOS_URL: http://ms-eventos:8081
+      RESERVAS_URL: http://ms-reservas:8082
+      TICKETS_STORAGE_PATH: /app/tickets
+      AWS_REGION: us-east-1
+      AWS_SHARED_CREDENTIALS_FILE: /app/.aws/credentials
+      AWS_CONFIG_FILE: /app/.aws/config
+      S3_BUCKET: eventos-tickets-339713161614
+    volumes:
+      - /mnt/efs/tickets:/app/tickets
+      - /home/ubuntu/.aws:/app/.aws:ro
+    depends_on:
+      - ms-reservas
+    networks:
+      - backend
+
+  api-gateway:
+    build: ../api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      EVENTOS_URL: http://ms-eventos:8081
+      RESERVAS_URL: http://ms-reservas:8082
+      TICKETS_URL: http://ms-tickets:8083
+    depends_on:
+      - ms-eventos
+      - ms-reservas
+      - ms-tickets
+    networks:
+      - backend
+
+networks:
+  backend:
+    external: true
+    name: infra_default
